@@ -14,17 +14,27 @@ interface MochiProps {
 export default function Mochi({ isTalking, emotion = 'IDLE', onPoke }: MochiProps) {
   const meshRef = useRef<THREE.Mesh>(null);
   const faceRef = useRef<THREE.Group>(null);
+  const eyeLeftPupilRef = useRef<THREE.Mesh>(null);
+  const eyeRightPupilRef = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
   const [pushed, setPushed] = useState(false);
+  const [blink, setBlink] = useState(false);
+  
   useCursor(hovered);
 
-  // Mochi logic: bobbing and talking animation
+  // Mochi logic: bobbing, talking, and blinking animation
   useFrame((state) => {
     if (!meshRef.current) return;
     const t = state.clock.getElapsedTime();
     
-    // Smooth idle bobbing
-    meshRef.current.position.y = Math.sin(t * 2) * 0.1;
+    // Smooth floating logic (increased for "mengambang" effect)
+    meshRef.current.position.y = Math.sin(t * 1.5) * 0.25;
+
+    // Random blinking logic
+    if (Math.random() < 0.01 && !blink) {
+      setBlink(true);
+      setTimeout(() => setBlink(false), 150);
+    }
 
     // SHY animation: shaking a bit
     if (emotion === 'SHY') {
@@ -46,6 +56,30 @@ export default function Mochi({ isTalking, emotion = 'IDLE', onPoke }: MochiProp
     // Facing the camera slightly
     if (faceRef.current) {
       faceRef.current.rotation.y = Math.sin(t * 0.5) * 0.1;
+      
+      // Eye scaling (blinking)
+      const eyeScaleY = blink ? 0.1 : 1;
+      faceRef.current.children.forEach((child) => {
+        if (child.name === 'eye') {
+          child.scale.set(1, eyeScaleY, 1);
+        }
+      });
+    }
+
+    // Pupil animations based on emotion
+    const pupilTargetScale = emotion === 'HAPPY' ? 1.4 : emotion === 'SURPRISED' ? 0.6 : 1.0;
+    const lerpFactor = 0.1;
+    if (eyeLeftPupilRef.current && eyeRightPupilRef.current) {
+      eyeLeftPupilRef.current.scale.lerp(new THREE.Vector3(pupilTargetScale, pupilTargetScale, pupilTargetScale), lerpFactor);
+      eyeRightPupilRef.current.scale.lerp(new THREE.Vector3(pupilTargetScale, pupilTargetScale, pupilTargetScale), lerpFactor);
+      
+      if (emotion === 'SURPRISED') {
+        eyeLeftPupilRef.current.position.x = Math.sin(t * 20) * 0.05;
+        eyeRightPupilRef.current.position.x = Math.sin(t * 20) * 0.05;
+      } else {
+        eyeLeftPupilRef.current.position.x = 0;
+        eyeRightPupilRef.current.position.x = 0;
+      }
     }
   });
 
@@ -57,9 +91,10 @@ export default function Mochi({ isTalking, emotion = 'IDLE', onPoke }: MochiProp
   // Emotion-based colors and materials
   const mochiColor = emotion === 'SHY' ? '#ffccd5' : (emotion === 'SAD' ? '#d1e8ff' : '#ffd1dc');
   const blushOpacity = emotion === 'SHY' ? 0.9 : 0.4;
+  const pupilColor = emotion === 'SHY' ? '#ff99aa' : (emotion === 'SAD' ? '#66b3ff' : '#00ffd2');
 
   return (
-    <group>
+    <group scale={[0.7, 0.7, 0.7]}>
       <Sphere
         args={[1.5, 64, 64]}
         ref={meshRef}
@@ -78,16 +113,16 @@ export default function Mochi({ isTalking, emotion = 'IDLE', onPoke }: MochiProp
         {/* Faces */}
         <group ref={faceRef} position={[0, 0, 1.4]} scale={[0.1, 0.1, 0.1]}>
           {/* Robot Eyes Container */}
-          <group position={[-2, 0.7, 0]}>
+          <group name="eye" position={[-2, 0.7, 0]}>
             {/* Outer Lens Ring */}
             <mesh>
               <ringGeometry args={[0.6, 0.8, 32]} />
               <meshBasicMaterial color="#333" />
             </mesh>
             {/* Glowing Digital Pupil */}
-            <mesh position={[0, 0, 0.1]}>
+            <mesh ref={eyeLeftPupilRef} position={[0, 0, 0.1]}>
               <sphereGeometry args={[0.4, 16, 16]} />
-              <meshBasicMaterial color={emotion === 'SHY' ? '#ff99aa' : '#00ffd2'} />
+              <meshBasicMaterial color={pupilColor} />
             </mesh>
             {/* Reflection / Robot Light */}
             <mesh position={[0.15, 0.15, 0.2]}>
@@ -96,16 +131,16 @@ export default function Mochi({ isTalking, emotion = 'IDLE', onPoke }: MochiProp
             </mesh>
           </group>
 
-          <group position={[2, 0.7, 0]}>
+          <group name="eye" position={[2, 0.7, 0]}>
             {/* Outer Lens Ring */}
             <mesh>
               <ringGeometry args={[0.6, 0.8, 32]} />
               <meshBasicMaterial color="#333" />
             </mesh>
             {/* Glowing Digital Pupil */}
-            <mesh position={[0, 0, 0.1]}>
+            <mesh ref={eyeRightPupilRef} position={[0, 0, 0.1]}>
               <sphereGeometry args={[0.4, 16, 16]} />
-              <meshBasicMaterial color={emotion === 'SHY' ? '#ff99aa' : '#00ffd2'} />
+              <meshBasicMaterial color={pupilColor} />
             </mesh>
             {/* Reflection / Robot Light */}
             <mesh position={[0.15, 0.15, 0.2]}>
@@ -145,9 +180,9 @@ export default function Mochi({ isTalking, emotion = 'IDLE', onPoke }: MochiProp
       </Sphere>
       
       {/* Shadow */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.6, 0]}>
-        <planeGeometry args={[3, 3]} />
-        <meshBasicMaterial color="#000" transparent opacity={0.1} />
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.8, 0]} scale={1 - meshRef.current?.position.y * 0.5 || 1}>
+        <circleGeometry args={[1.5, 32]} />
+        <meshBasicMaterial color="#ff8ba7" transparent opacity={0.15} />
       </mesh>
     </group>
   );
