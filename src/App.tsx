@@ -68,40 +68,51 @@ export default function App() {
       parts: [{ text: m.text }]
     }));
 
-    const rawResponse = await chatWithMochi(userMessage, history);
-    
-    // Parse emotion tag
-    let emotion: MochiEmotion = 'IDLE';
-    let cleanText = rawResponse;
-    const emotionMatch = rawResponse.match(/^\[(HAPPY|SHY|SAD|SURPRISED|CLUMSY|IDLE)\]/);
-    if (emotionMatch) {
-      emotion = emotionMatch[1] as MochiEmotion;
-      cleanText = cleanText.replace(/^\[.*?\]\s*/, '');
-    }
+    try {
+      const rawResponse = await chatWithMochi(userMessage, history);
+      
+      // Parse emotion tag
+      let emotion: MochiEmotion = 'IDLE';
+      let cleanText = rawResponse;
+      const emotionMatch = rawResponse.match(/^\[(HAPPY|SHY|SAD|SURPRISED|CLUMSY|IDLE)\]/);
+      if (emotionMatch) {
+        emotion = emotionMatch[1] as MochiEmotion;
+        cleanText = cleanText.replace(/^\[.*?\]\s*/, '');
+      }
 
-    // Parse game status
-    let gameStatus: 'WIN' | 'LOSE' | 'NONE' = 'NONE';
-    if (cleanText.includes('{WIN}')) {
-      gameStatus = 'WIN';
-      cleanText = cleanText.replace('{WIN}', '');
-      setScore(s => s + 1);
-      sounds.playWin();
-      confetti({
-        particleCount: 150,
-        spread: 100,
-        origin: { y: 0.6 },
-        colors: ['#ffd1dc', '#ffff00', '#00ff00']
-      });
-    } else if (cleanText.includes('{LOSE}')) {
-      gameStatus = 'LOSE';
-      cleanText = cleanText.replace('{LOSE}', '');
-    }
+      // Parse game status
+      let gameStatus: 'WIN' | 'LOSE' | 'NONE' = 'NONE';
+      if (cleanText.includes('{WIN}')) {
+        gameStatus = 'WIN';
+        cleanText = cleanText.replace('{WIN}', '');
+        setScore(s => s + 1);
+        sounds.playWin();
+        confetti({
+          particleCount: 150,
+          spread: 100,
+          origin: { y: 0.6 },
+          colors: ['#ffd1dc', '#ffff00', '#00ff00']
+        });
+      } else if (cleanText.includes('{LOSE}')) {
+        gameStatus = 'LOSE';
+        cleanText = cleanText.replace('{LOSE}', '');
+      }
 
-    setMessages(prev => [...prev, { role: 'model', text: cleanText, emotion, gameStatus }]);
-    setCurrentEmotion(emotion);
-    sounds.playPop();
-    setIsLoading(false);
-    speak(cleanText);
+      setMessages(prev => [...prev, { role: 'model', text: cleanText, emotion, gameStatus }]);
+      setCurrentEmotion(emotion);
+      sounds.playPop();
+      setIsLoading(false);
+      speak(cleanText);
+    } catch (err: any) {
+      console.error(err);
+      const errorText = err.message?.includes('GEMINI_API_KEY') 
+        ? "Mochi butuh kunci ajaib (GEMINI_API_KEY) untuk bisa bicara di Vercel! Mohon hubungi admin untuk memasangnya di Environment Variables."
+        : "Oops! Mochi tersandung permen... Coba lagi ya!";
+      
+      setMessages(prev => [...prev, { role: 'model', text: errorText, emotion: 'SAD' }]);
+      setCurrentEmotion('SAD');
+      setIsLoading(false);
+    }
   };
 
   const startNewGame = () => {
@@ -192,7 +203,7 @@ export default function App() {
         </div>
       </header>
 
-      <main className="flex-1 p-4 md:p-8 overflow-hidden relative z-10 w-full h-full">
+      <main className="flex-1 p-4 md:p-8 overflow-hidden relative z-10">
         {/* Full Screen Chat Container */}
         <div className="max-w-6xl mx-auto w-full h-full bg-white/40 backdrop-blur-xl rounded-[3.5rem] border-4 border-white shadow-2xl flex flex-col md:flex-row overflow-hidden relative">
           
@@ -263,10 +274,10 @@ export default function App() {
           </div>
 
           {/* Right Side: Chat Logic */}
-          <div className="flex-1 flex flex-col bg-white/40 backdrop-blur-xl h-full min-h-0">
+          <div className="flex-1 flex flex-col bg-white/40 backdrop-blur-xl h-full min-h-0 relative">
             <div 
               ref={scrollRef}
-              className="flex-1 overflow-y-auto p-6 md:p-8 space-y-4 md:space-y-6 scroll-smooth custom-scrollbar"
+              className="flex-1 overflow-y-auto p-4 md:p-6 space-y-3 md:space-y-4 scroll-smooth custom-scrollbar"
             >
             <AnimatePresence initial={false}>
               {messages.map((m, i) => (
@@ -276,20 +287,20 @@ export default function App() {
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
-                  <div className={`flex gap-3 md:gap-4 max-w-[85%] md:max-w-[70%] ${m.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
-                    <div className={`w-8 h-8 md:w-9 md:h-9 rounded-xl flex-shrink-0 flex items-center justify-center shadow-sm ${m.role === 'user' ? 'bg-[#ff8ba7]' : 'bg-white border border-[#ffd1dc]'}`}>
-                      {m.role === 'user' ? <User className="w-4 h-4 md:w-5 md:h-5 text-white" /> : <Bot className="w-4 h-4 md:w-5 md:h-5 text-[#ff8ba7]" />}
+                  <div className={`flex gap-2 md:gap-3 max-w-[85%] md:max-w-[80%] ${m.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
+                    <div className={`w-7 h-7 md:w-8 md:h-8 rounded-lg flex-shrink-0 flex items-center justify-center shadow-sm ${m.role === 'user' ? 'bg-[#ff8ba7]' : 'bg-white border border-[#ffd1dc]'}`}>
+                      {m.role === 'user' ? <User className="w-4 h-4 text-white" /> : <Bot className="w-4 h-4 text-[#ff8ba7]" />}
                     </div>
-                    <div className="flex flex-col gap-1">
-                      <div className={`p-3 md:p-4 rounded-2xl text-xs md:text-sm leading-relaxed shadow-sm relative overflow-hidden ${
+                    <div className="flex flex-col gap-0.5">
+                      <div className={`p-2.5 md:p-3 rounded-xl text-[11px] md:text-xs leading-relaxed shadow-sm relative overflow-hidden ${
                         m.role === 'user' 
                           ? 'bg-[#ff8ba7] text-white rounded-tr-none' 
-                          : 'bg-white text-[#5c4044] border-2 border-[#fff5f7] rounded-tl-none shadow-[0_2px_10px_rgba(255,209,220,0.05)]'
+                          : 'bg-white text-[#5c4044] border border-[#fff5f7] rounded-tl-none'
                       }`}>
                         {m.text}
-                        {m.gameStatus === 'WIN' && <Trophy className="absolute -top-1 -right-1 w-8 h-8 text-yellow-400 opacity-20" />}
+                        {m.gameStatus === 'WIN' && <Trophy className="absolute -top-1 -right-1 w-6 h-6 text-yellow-400 opacity-20" />}
                       </div>
-                      {m.emotion && <span className="text-[8px] font-bold text-[#ffc2d1] uppercase tracking-widest ml-2">{m.emotion}</span>}
+                      {m.emotion && <span className="text-[7px] font-bold text-[#ffc2d1] uppercase tracking-widest ml-1">{m.emotion}</span>}
                     </div>
                   </div>
                 </motion.div>
